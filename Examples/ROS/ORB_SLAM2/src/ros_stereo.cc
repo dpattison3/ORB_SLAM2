@@ -33,6 +33,7 @@
 #include<opencv2/core/core.hpp>
 
 #include"../../../include/System.h"
+#include <boost/filesystem.hpp>
 
 using namespace std;
 
@@ -50,28 +51,45 @@ public:
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "RGBD");
+    ros::init(argc, argv, "Stereo");
     ros::start();
+    ros::NodeHandle nh;
 
-    if(argc != 4)
-    {
-        cerr << endl << "Usage: rosrun ORB_SLAM2 Stereo path_to_vocabulary path_to_settings do_rectify" << endl;
-        ros::shutdown();
-        return 1;
-    }    
+    std::string settingsFilePath;
+    std::string vocabularyFilePath;
+    std::string leftCameraTopic;
+    std::string rightCameraTopic;
+    bool rectify;
+    nh.param<std::string>("setting_file_path", settingsFilePath);
+    nh.param<std::string>("vocabulary_file_path", vocabularyFilePath);
+    nh.param<std::string>("left_camera_topic", leftCameraTopic);
+    nh.param<std::string>("right_camera_topic", rightCameraTopic);
+    nh.param<bool>("rectify", rectify, true);
+
+    std::ifstream voc(vocabularyFilePath);
+    std::ifstream set(settingsFilePath);
+    std::cout<<voc.good()<<std::endl;
+    std::cout<<set.good()<<std::endl;
+
+    std::cout<<boost::filesystem::exists(settingsFilePath)<<std::endl;
+
+
+    char result[ PATH_MAX ];
+    ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
+    std::cout<<std::string( result, (count > 0) ? count : 0 )<<std::endl;
+
+
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::STEREO,true);
+    ORB_SLAM2::System SLAM(vocabularyFilePath, settingsFilePath, ORB_SLAM2::System::STEREO, true);
 
     ImageGrabber igb(&SLAM);
-
-    stringstream ss(argv[3]);
-	ss >> boolalpha >> igb.do_rectify;
+    igb.do_rectify = rectify;
 
     if(igb.do_rectify)
     {      
         // Load settings related to stereo calibration
-        cv::FileStorage fsSettings(argv[2], cv::FileStorage::READ);
+        cv::FileStorage fsSettings(settingsFilePath, cv::FileStorage::READ);
         if(!fsSettings.isOpened())
         {
             cerr << "ERROR: Wrong path to settings" << endl;
@@ -107,10 +125,9 @@ int main(int argc, char **argv)
         cv::initUndistortRectifyMap(K_r,D_r,R_r,P_r.rowRange(0,3).colRange(0,3),cv::Size(cols_r,rows_r),CV_32F,igb.M1r,igb.M2r);
     }
 
-    ros::NodeHandle nh;
 
-    message_filters::Subscriber<sensor_msgs::Image> left_sub(nh, "/camera/left/image_raw", 1);
-    message_filters::Subscriber<sensor_msgs::Image> right_sub(nh, "camera/right/image_raw", 1);
+    message_filters::Subscriber<sensor_msgs::Image> left_sub(nh, leftCameraTopic, 1);
+    message_filters::Subscriber<sensor_msgs::Image> right_sub(nh, rightCameraTopic, 1);
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
     message_filters::Synchronizer<sync_pol> sync(sync_pol(10), left_sub,right_sub);
     sync.registerCallback(boost::bind(&ImageGrabber::GrabStereo,&igb,_1,_2));
