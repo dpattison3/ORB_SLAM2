@@ -36,6 +36,7 @@
 #include<iostream>
 
 #include<mutex>
+#include<chrono>
 
 
 using namespace std;
@@ -266,6 +267,8 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
 
 void Tracking::Track()
 {
+    auto start = std::chrono::high_resolution_clock::now();
+
     if(mState==NO_IMAGES_YET)
     {
         mState = NOT_INITIALIZED;
@@ -390,6 +393,10 @@ void Tracking::Track()
                     bOK = bOKReloc || bOKMM;
                 }
             }
+
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = end - start;
+            std::cout<<"tracking: "<<duration.count()<<std::endl;
         }
 
         mCurrentFrame.mpReferenceKF = mpReferenceKF;

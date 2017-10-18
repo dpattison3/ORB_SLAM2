@@ -55,33 +55,18 @@ int main(int argc, char **argv)
     ros::start();
     ros::NodeHandle nh;
 
-    std::string settingsFilePath;
-    std::string vocabularyFilePath;
-    std::string leftCameraTopic;
-    std::string rightCameraTopic;
-    bool rectify;
-    nh.param<std::string>("setting_file_path", settingsFilePath);
-    nh.param<std::string>("vocabulary_file_path", vocabularyFilePath);
-    nh.param<std::string>("left_camera_topic", leftCameraTopic);
-    nh.param<std::string>("right_camera_topic", rightCameraTopic);
-    nh.param<bool>("rectify", rectify, true);
-
-    std::ifstream voc(vocabularyFilePath);
-    std::ifstream set(settingsFilePath);
-    std::cout<<voc.good()<<std::endl;
-    std::cout<<set.good()<<std::endl;
-
-    std::cout<<boost::filesystem::exists(settingsFilePath)<<std::endl;
-
-
-    char result[ PATH_MAX ];
-    ssize_t count = readlink( "/proc/self/exe", result, PATH_MAX );
-    std::cout<<std::string( result, (count > 0) ? count : 0 )<<std::endl;
-
+    std::string settingsFilePath, vocabularyFilePath, leftCameraTopic, rightCameraTopic;
+    bool rectify, visualize;
+    nh.param<std::string>("/setting_file_path", settingsFilePath, "settingsFilePath.yaml");
+    nh.param<std::string>("/vocabulary_file_path", vocabularyFilePath, "ORBvoc.txt");
+    nh.param<std::string>("/left_camera_topic", leftCameraTopic, "/camera_left");
+    nh.param<std::string>("/right_camera_topic", rightCameraTopic, "/camera_right");
+    nh.param<bool>("/rectify", rectify, true);
+    nh.param<bool>("/visualize", visualize, false);
 
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(vocabularyFilePath, settingsFilePath, ORB_SLAM2::System::STEREO, true);
+    ORB_SLAM2::System SLAM(vocabularyFilePath, settingsFilePath, ORB_SLAM2::System::STEREO, visualize);
 
     ImageGrabber igb(&SLAM);
     igb.do_rectify = rectify;
@@ -138,9 +123,9 @@ int main(int argc, char **argv)
     SLAM.Shutdown();
 
     // Save camera trajectory
-    SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory_TUM_Format.txt");
-    SLAM.SaveTrajectoryTUM("FrameTrajectory_TUM_Format.txt");
-    SLAM.SaveTrajectoryKITTI("FrameTrajectory_KITTI_Format.txt");
+    //SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory_TUM_Format.txt");
+    //SLAM.SaveTrajectoryTUM("FrameTrajectory_TUM_Format.txt");
+    //SLAM.SaveTrajectoryKITTI("FrameTrajectory_KITTI_Format.txt");
 
     ros::shutdown();
 
@@ -151,19 +136,10 @@ void ImageGrabber::GrabStereo(const sensor_msgs::ImageConstPtr& msgLeft,const se
 {
     // Copy the ros image message to cv::Mat.
     cv_bridge::CvImageConstPtr cv_ptrLeft;
-    try
-    {
-        cv_ptrLeft = cv_bridge::toCvShare(msgLeft);
-    }
-    catch (cv_bridge::Exception& e)
-    {
-        ROS_ERROR("cv_bridge exception: %s", e.what());
-        return;
-    }
-
     cv_bridge::CvImageConstPtr cv_ptrRight;
     try
     {
+        cv_ptrLeft = cv_bridge::toCvShare(msgLeft);
         cv_ptrRight = cv_bridge::toCvShare(msgRight);
     }
     catch (cv_bridge::Exception& e)
@@ -171,6 +147,7 @@ void ImageGrabber::GrabStereo(const sensor_msgs::ImageConstPtr& msgLeft,const se
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
     }
+
 
     if(do_rectify)
     {
@@ -183,7 +160,5 @@ void ImageGrabber::GrabStereo(const sensor_msgs::ImageConstPtr& msgLeft,const se
     {
         mpSLAM->TrackStereo(cv_ptrLeft->image,cv_ptrRight->image,cv_ptrLeft->header.stamp.toSec());
     }
-
 }
-
 
