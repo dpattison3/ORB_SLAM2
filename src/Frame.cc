@@ -92,6 +92,31 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
 
     ComputeStereoMatches();
 
+
+
+    // we want to create a way to visualize the depth statistics
+    std::cout<<"depths: "<<mvDepth.size()<<std::endl;
+    float min = 0;
+    float max = *std::max_element(mvDepth.begin(), mvDepth.end()) + 0.00001;
+    int hist[] = {0,0,0,0,0,0,0,0,0,0,0,0};
+    for (auto i = mvDepth.begin(); i != mvDepth.end(); ++i)
+    {
+      if (*i <= 0)
+        hist[0]++;
+      else if (*i > 250)
+        hist[11]++;
+      else
+        hist[((int) std::floor(10*(*i) / 250.1))+1]++;
+    }
+
+    std::cout << "[no match]: " << hist[0] << std::endl;
+    for (int i = 1; i < 11; ++i)
+      printf("[%f - %f]: %d\n", (i-1)*250./10, i*250./10, hist[i]);
+    std::cout << "[>250]: " << hist[11] << std::endl;
+
+
+
+
     mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));    
     mvbOutlier = vector<bool>(N,false);
 
